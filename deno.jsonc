@@ -1,0 +1,17 @@
+{
+  "tasks": {
+    "bundle": "deno bundle --unstable --config deno.jsonc main.ts dist/syneddb.js"
+  },
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": false,
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "dom.asynciterable",
+      "deno.ns",
+      "deno.unstable"
+    ],
+    "types": ["https://gist.githubusercontent.com/mstoecklein/6f0787c663101f78367586d675dd2088/raw/10a09385b0b7f04cc93c2be79f716dc72a1e7b91/serviceworker.d.ts"]
+  }
+}
