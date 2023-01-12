@@ -28,10 +28,9 @@
 
 <p align="center">
   <a href="#dart-about">About</a> &#xa0; | &#xa0; 
-  <a href="#sparkles-features">Features</a> &#xa0; | &#xa0;
   <a href="#rocket-technologies">Technologies</a> &#xa0; | &#xa0;
   <a href="#white_check_mark-requirements">Requirements</a> &#xa0; | &#xa0;
-  <a href="#checkered_flag-starting">Starting</a> &#xa0; | &#xa0;
+  <a href="#checkered_flag-starting">Getting started</a> &#xa0; | &#xa0;
   <a href="#memo-license">License</a> &#xa0; | &#xa0;
   <a href="https://github.com/xpectme" target="_blank">Author</a>
 </p>
@@ -47,32 +46,58 @@ Synceddb is a project that aims to help developers to sync their database with t
 The following tools were used in this project:
 
 - [Deno](https://deno.land/)
-- [TypeScript](https://www.typescriptlang.org/)
+- [idbx](https://github.com/xpectme/idbx) - an indexedDB wrapper
 
-## :checkered_flag: Starting ##
+## Getting started ##
 
-```bash
-# Clone this project
-$ git clone https://github.com/xpectme/synceddb
+```ts
+import * as idbx from "https://deno.land/x/idbx/main.ts";
+import { SyncedDB } from "https://deno.land/x/synceddb/main.ts";
 
-# Access
-$ cd synceddb
+// create a database
+const dbreq = idbx.open('my-database', 1);
 
-# Install dependencies
-$ yarn
+// create a store
+dbreq.upgrade((event) => {
+  const target = event.target as IDBOpenDBRequest;
+  const db = target.result;
+  SyncedDB.createStore(db, "mystore");
+});
 
-# Run the project
-$ yarn start
+// wait for DB to initialize
+const db = await dbreq.ready;
 
-# The server will initialize in the <http://localhost:3000>
+// create a synceddb instance
+const syncdb = new SyncedDB(db, "mystore", {
+keyName: "id",
+  // Default Settings:
+  
+  // url: location.origin,
+  // autoSync: false,
+  // createPath: "/api/create",
+  // readPath: "/api/read",
+  // updatePath: "/api/update",
+  // deletePath: "/api/delete",
+  // readAllPath: "/api/read_all",
+  // syncPath: "/api/sync",
+});
+
+const result = await syncdb.create({
+  title: "Awesome!",
+  description: "Probably a reinvention of the wheel ;-P"
+});
+// case 1 (online): writes entry into the indexedDB store and send the entry to the server
+//                  sync_action: "none", sync_status: "synced"
+// case 2 (offline): writes entry into the indexedDB store and creates a temporary ID
+//                  sync_action: "create", sync_status: "unsynced"
 ```
 
-## :memo: License ##
+## License ##
 
 This project is under license from MIT. For more details, see the [LICENSE](LICENSE) file.
 
 
-Made with :heart: by <a href="https://github.com/xpectme" target="_blank">{{YOUR_NAME}}</a>
+Made by <a href="https://github.com/mstoecklein" target="_blank">Mario Stöcklein</a>
 
 &#xa0;
 
