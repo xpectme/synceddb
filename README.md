@@ -37,11 +37,11 @@
 
 <br>
 
-## :dart: About ##
+## About ##
 
 Synceddb is a project that aims to help developers to sync their database with their mobile app.
 
-## :rocket: Technologies ##
+## Technologies ##
 
 The following tools were used in this project:
 
