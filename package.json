@@ -7,6 +7,7 @@
   "browser": "dest/synceddb.js",
   "main": "dest/synceddb.js",
   "type": "module",
+  "private": false,
   "scripts": {
     "ts-types": " tsc --emitDeclarationOnly",
     "replaceDts": "find dest -type f -name \"*.d.ts\" -exec sh -c 'sed \"s/\\.ts/\\.d.ts/g\" \"$0\" > \"$0.tmp\" && mv \"$0.tmp\" \"$0\"' {} \\;",
