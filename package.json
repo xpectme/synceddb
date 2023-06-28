@@ -1,5 +1,5 @@
 {
-  "name": "synceddb",
+  "name": "@xplive/synceddb",
   "version": "1.0.2",
   "description": "No-bullshit indexedDB wrapper functions with promises, iterators and shortcuts.",
   "types": "dest/synceddb.d.ts",
