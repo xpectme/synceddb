@@ -1,20 +1,19 @@
 {
   "name": "synceddb",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "No-bullshit indexedDB wrapper functions with promises, iterators and shortcuts.",
   "types": "dest/synceddb.d.ts",
-  "module": "dest/synceddb.esm.js",
-  "browser": "dest/synceddb.browser.js",
-  "main": "dest/synceddb.esm.js",
+  "module": "dest/synceddb.js",
+  "browser": "dest/synceddb.js",
+  "main": "dest/synceddb.js",
   "type": "module",
   "scripts": {
     "ts-types": " tsc --emitDeclarationOnly",
     "replaceDts": "find dest -type f -name \"*.d.ts\" -exec sh -c 'sed \"s/\\.ts/\\.d.ts/g\" \"$0\" > \"$0.tmp\" && mv \"$0.tmp\" \"$0\"' {} \\;",
     "bundleDts": "echo \"$(grep -o '\".*\"' dest/types/main.d.ts | sed 's/\"//g' | xargs -I{} cat dest/types/{})\" > dest/synceddb.d.ts",
     "unimportDts": "echo \"$(grep -vE '^import\\s.*;' dest/synceddb.d.ts)\" > dest/synceddb.d.ts",
-    "browser": "sed -i '' 's/idbx/https:\\/\\/esm.sh\\/idbx@v1.0.4?dts/g' dest/synceddb.browser.js",
     "dts": "npm run ts-types && npm run replaceDts && npm run bundleDts && npm run unimportDts && rimraf dest/types",
-    "build": "rimraf dest && node ./esbuild.js && npm run browser && npm run dts"
+    "build": "rimraf dest && node ./esbuild.js && npm run dts"
   },
   "keywords": [],
   "author": "Mario Stöcklein <mstoecklein@xp.live>",

@@ -8,7 +8,10 @@
     "strict": true,
     "noImplicitAny": false,
     "esModuleInterop": true,
-    "moduleResolution": "NodeNext"
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "npm:idbx": ["./node_modules/idbx/dest/idbx.d.ts"]
+    }
   },
   "exclude": ["node_modules", "dest", "mod.ts", "**/*_test.ts", "esbuild.js"]
 }

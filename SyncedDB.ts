@@ -1,4 +1,4 @@
-import * as idbx from "idbx";
+import * as idbx from "npm:idbx";
 import { SyncedDBOptions } from "./SyncedDBOptions.ts";
 import { SyncedDBAction } from "./SyncedDBAction.ts";
 import { SyncedDBState } from "./SyncedDBState.ts";
