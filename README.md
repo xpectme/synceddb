@@ -18,12 +18,6 @@
   <img alt="License" src="https://img.shields.io/github/license/xpectme/synceddb?color=56BEB8">
 </p>
 
-<!-- Status -->
-
-<h4 align="center"> 
-	🚧  Synceddb 🚀 Under construction...  🚧
-</h4> 
-
 <hr>
 
 <p align="center">
@@ -39,13 +33,12 @@
 
 ## About ##
 
-Synceddb is a project that aims to help developers to sync their database with their mobile app.
+Client-side CRUD operations between indexedDB and a server.
 
 ## Technologies ##
 
 The following tools were used in this project:
 
-- [Deno](https://deno.land/)
 - [idbx](https://github.com/xpectme/idbx) - an indexedDB wrapper
 
 ## Getting started ##

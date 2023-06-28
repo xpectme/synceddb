@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "bundle": "deno bundle --unstable --config deno.jsonc main.ts dist/syneddb.js"
+    "bundle": "deno bundle --unstable --config deno.jsonc main.ts dest/syneddb.js"
   },
   "compilerOptions": {
     "allowJs": true,
@@ -12,6 +12,9 @@
       "deno.ns",
       "deno.unstable"
     ],
-    "types": ["https://gist.githubusercontent.com/mstoecklein/6f0787c663101f78367586d675dd2088/raw/10a09385b0b7f04cc93c2be79f716dc72a1e7b91/serviceworker.d.ts"]
-  }
+    "types": [
+      "https://gist.githubusercontent.com/mstoecklein/6f0787c663101f78367586d675dd2088/raw/10a09385b0b7f04cc93c2be79f716dc72a1e7b91/serviceworker.d.ts"
+    ]
+  },
+  "exclude": ["node_modules", "dest", "mod.ts", "**/*_test.ts", "esbuild.js"]
 }

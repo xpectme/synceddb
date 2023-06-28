@@ -1,10 +1,10 @@
 // deno-lint-ignore-file no-explicit-any
-import "https://deno.land/x/indexeddb@v1.1.0/polyfill_memory.ts";
+import "https://deno.land/x/indexeddb@1.3.5/polyfill_memory.ts";
 import {
   assert,
   assertEquals,
-} from "https://deno.land/std@0.152.0/testing/asserts.ts";
-import * as idbx from "https://deno.land/x/idbx@v1.0.2/main.ts";
+} from "https://deno.land/std@0.192.0/testing/asserts.ts";
+import * as idbx from "https://deno.land/x/idbx@v1.0.4/mod.ts";
 import * as mf from "https://deno.land/x/mock_fetch@0.3.0/mod.ts";
 
 mf.install();

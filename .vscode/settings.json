@@ -7,6 +7,7 @@
   "deno.codeLens.references": true,
   "deno.unstable": true,
   "deno.codeLens.test": true,
+  "deno.cache": ".deno_cache",
   "deno.config": "./deno.jsonc",
   "editor.formatOnSave": true,
   "files.autoSave": "afterDelay",
