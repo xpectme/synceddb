@@ -53,9 +53,13 @@ export class SyncedDB<T extends SyncedDBInfo>
     // deno-lint-ignore no-explicit-any
     prototype: SyncedDBEventTarget<any>;
   }) {
-  static createStore(db: IDBDatabase, storeName: string, keyPath = "id") {
-    const store = db.createObjectStore(storeName, {
-      keyPath,
+  static createStore(
+    db: IDBDatabase,
+    storeName: string,
+    options?: IDBObjectStoreParameters,
+  ) {
+    const store = db.createObjectStore(storeName, options ?? {
+      keyPath: "id",
       autoIncrement: false,
     });
     store.createIndex("syncState", "sync_state", { unique: false });
