@@ -59,7 +59,7 @@ export declare class SyncedDB<T extends SyncedDBInfo> extends SyncedDB_base {
     #private;
     db: IDBDatabase;
     storeName: string;
-    static createStore(db: IDBDatabase, storeName: string, keyPath?: string): IDBObjectStore;
+    static createStore(db: IDBDatabase, storeName: string, options?: IDBObjectStoreParameters): IDBObjectStore;
     options: SyncedDBOptions;
     syncState: Promise<string>;
     lastSync: number;
