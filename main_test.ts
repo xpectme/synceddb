@@ -108,7 +108,7 @@ const createRoutes = () => {
     );
   });
 
-  mf.mock("GET@/api/read_all", (req) => {
+  mf.mock("GET@/api/read_all", () => {
     return new Response(
       JSON.stringify([
         {

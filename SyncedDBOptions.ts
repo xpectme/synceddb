@@ -8,4 +8,5 @@ export interface SyncedDBOptions {
   deletePath: string;
   readAllPath: string;
   syncPath: string;
+  dryRun: boolean;
 }

@@ -2,8 +2,57 @@ import * as idbx from "npm:idbx";
 import { SyncedDBOptions } from "./SyncedDBOptions.ts";
 import { SyncedDBAction } from "./SyncedDBAction.ts";
 import { SyncedDBState } from "./SyncedDBState.ts";
+import { SyncedDBResponse } from "./SyncedDBResponse.ts";
+import { SyncedDBRequest } from "./SyncedDBRequest.ts";
+import { SyncedDBInfo } from "./SyncedDBInfo.ts";
+import { SyncedDBEventMap } from "./SyncedDBEventMap.ts";
+import { SyncedDBEventTarget } from "./SyncedDBEventTarget.ts";
 
-export class SyncedDB<T> {
+let currentTime = 0;
+let currentCount = 0;
+function dryRunId(padding = 1) {
+  const now = Date.now();
+  if (now === currentTime) {
+    currentCount++;
+  } else {
+    currentTime = now;
+    currentCount = 0;
+  }
+  return `${now}${currentCount.toString().padStart(padding, "0")}`;
+}
+
+export interface SyncedDB<T extends SyncedDBInfo>
+  extends SyncedDBEventTarget<T> {
+  addEventListener<K extends keyof SyncedDBEventMap<T>>(
+    type: K,
+    listener: ((ev: SyncedDBEventMap<T>[K]) => void) | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject | null,
+    options?: EventListenerOptions | boolean,
+  ): void;
+
+  removeEventListener<K extends keyof SyncedDBEventMap<T>>(
+    type: K,
+    listener: ((ev: SyncedDBEventMap<T>[K]) => void) | null,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  removeEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject | null,
+    options?: EventListenerOptions | boolean,
+  ): void;
+}
+
+export class SyncedDB<T extends SyncedDBInfo>
+  extends (EventTarget as unknown as {
+    // deno-lint-ignore no-explicit-any
+    new (): SyncedDBEventTarget<any>;
+    // deno-lint-ignore no-explicit-any
+    prototype: SyncedDBEventTarget<any>;
+  }) {
   static createStore(db: IDBDatabase, storeName: string, keyPath = "id") {
     const store = db.createObjectStore(storeName, {
       keyPath,
@@ -24,9 +73,10 @@ export class SyncedDB<T> {
     public storeName: string,
     options?: Partial<SyncedDBOptions>,
   ) {
+    super();
     this.options = {
       keyName: "id",
-      url: (globalThis as any).location?.origin ?? "",
+      url: location?.origin ?? "",
       autoSync: false,
       createPath: "/api/create",
       readPath: "/api/read",
@@ -34,6 +84,7 @@ export class SyncedDB<T> {
       deletePath: "/api/delete",
       readAllPath: "/api/read_all",
       syncPath: "/api/sync",
+      dryRun: false,
       ...options,
     };
     globalThis.addEventListener("online", () => {
@@ -58,9 +109,11 @@ export class SyncedDB<T> {
     await idbx.add(store, item);
 
     if (navigator.onLine) {
-      return this.#fetchOne("POST", this.options.createPath, data, key);
+      const path = this.options.createPath;
+      const result = await this.#fetchOne("POST", path, data, key);
+      this.dispatchEvent(new MessageEvent("created", { data: result }));
+      return result;
     }
-
     return item as T;
   }
 
@@ -76,10 +129,14 @@ export class SyncedDB<T> {
     }
 
     if (navigator.onLine && !key.startsWith("TMP-") && forceSync) {
-      return this.#fetchOne("GET", this.options.readPath, undefined, key);
+      const path = this.options.readPath;
+      const result = await this.#fetchOne("GET", path, undefined, key);
+      this.dispatchEvent(new MessageEvent("read", { data: result }));
+      return result;
     }
 
-    return result as T;
+    this.dispatchEvent(new MessageEvent("read", { data: result }));
+    return result;
   }
 
   // create a method that updates the indexeddb store and send a fetch
@@ -95,9 +152,11 @@ export class SyncedDB<T> {
     await idbx.put(store, item);
 
     if (navigator.onLine) {
-      return this.#fetchOne("PUT", this.options.updatePath, data, key);
+      const path = this.options.updatePath;
+      const result = await this.#fetchOne("PUT", path, data, key);
+      this.dispatchEvent(new MessageEvent("updated", { data: result }));
+      return result;
     }
-
     return item as T;
   }
 
@@ -122,7 +181,9 @@ export class SyncedDB<T> {
 
     // delete the record
     if (navigator.onLine) {
-      await this.#fetchOne("DELETE", this.options.deletePath, undefined, key);
+      const path = this.options.deletePath;
+      await this.#fetchOne("DELETE", path, undefined, key);
+      this.dispatchEvent(new MessageEvent("deleted", { data: key }));
     }
   }
 
@@ -131,35 +192,47 @@ export class SyncedDB<T> {
   async readAll(forceSync = false) {
     const tx = this.db.transaction(this.storeName, "readonly");
     const store = tx.objectStore(this.storeName);
-    const result = await idbx.getAll(store);
+    let result = await idbx.getAll<T>(store);
 
     if (navigator.onLine && (result.length === 0 || forceSync)) {
       const url = new URL(this.options.url + this.options.readAllPath);
-      const response = await fetch(url, {
-        method: "GET",
-        mode: "cors",
-        credentials: "include",
-      });
+
+      let response: Response;
+      if (this.options.dryRun) {
+        console.log(`DRY RUN: GET ${url}`);
+        response = new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        response = await fetch(url, {
+          method: "GET",
+          mode: "cors",
+          credentials: "include",
+        });
+      }
+
       if (response.ok) {
-        const json = await response.json() ?? [];
+        const json: T[] = await response.json() ?? [];
         const store = this.#getStore("readwrite");
-        const items = (json ?? []).map((item: any) =>
+        const items = (json ?? []).map((item) =>
           this.#addSyncState(item, "none", "synced")
         );
 
         await idbx.putBulk(store, items);
 
         // add the TMP- items to the items array
-        const tmpItems = result.filter((item: any) =>
+        const tmpItems = result.filter((item) =>
           item[this.options.keyName].startsWith("TMP-")
         );
-        return [...items, ...tmpItems] as T[];
+        result = [...items, ...tmpItems] as T[];
       } else {
         // handle error
         console.log("fetch entries failed", response);
       }
     }
 
+    this.dispatchEvent(new MessageEvent("readAll", { data: result }));
     return result as T[];
   }
 
@@ -178,10 +251,8 @@ export class SyncedDB<T> {
     const index = store.index("syncState");
     const syncStore = index.objectStore;
 
-    const result = await idbx.getAll(syncStore);
-    const unsynced = result.filter((item: any) =>
-      item.sync_state === "unsynced"
-    );
+    const result = await idbx.getAll<T>(syncStore);
+    const unsynced = result.filter((item) => item.sync_state === "unsynced");
 
     if (unsynced.length === 0) {
       return;
@@ -190,34 +261,78 @@ export class SyncedDB<T> {
     // filter all items where keyName starts with TMP-
     const key = this.options.keyName;
     const createTmpIds = unsynced
-      .filter((item: any) => item.sync_action === "create")
-      .map((item: any) => item[key]);
+      .filter((item) => item.sync_action === "create")
+      .map<string>((item) => item[key]);
 
     // create groups from sync_action
-    const groups = unsynced.reduce((acc: any, item: any) => {
-      const { sync_action } = item;
-      if (!acc[sync_action]) {
-        acc[sync_action] = [];
-      }
-      acc[sync_action].push(item);
-      return acc;
-    }, {});
+    const groups = unsynced.reduce<SyncedDBRequest<T>>(
+      (acc, item) => {
+        if ("sync_action" in item) {
+          const { sync_action } = item;
+          if (sync_action !== undefined) {
+            if (!acc[sync_action]) {
+              acc[sync_action] = [];
+            }
+            acc[sync_action].push(item);
+          }
+        }
+        return acc;
+      },
+      {} as SyncedDBRequest<T>,
+    );
 
     const url = new URL(this.options.url + this.options.syncPath);
     url.searchParams.set("t", timestamp.toString());
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(groups),
-      mode: "cors",
-      credentials: "include",
-    });
+    let response: Response;
+    if (this.options.dryRun) {
+      // handle deletions
+      let deleted: string[] = [];
+      if ("delete" in groups) {
+        deleted = groups.delete.map((item: T) => item[key]);
+      }
+
+      // handle updates
+      let updated: T[] = [];
+      if ("update" in groups) {
+        updated = JSON.parse(JSON.stringify(groups.update));
+      }
+
+      // handle creations
+      let created: T[] = [];
+      if ("create" in groups) {
+        created = JSON.parse(JSON.stringify(groups.create)).map((item: T) => {
+          item[key] = dryRunId(3);
+          return item;
+        });
+      }
+
+      console.log(`DRY RUN: POST ${url}`);
+      response = new Response(
+        JSON.stringify({
+          deleted,
+          changed: [...updated, ...created],
+          timestamp: Date.now(),
+        } as SyncedDBResponse<T>),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    } else {
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(groups),
+        mode: "cors",
+        credentials: "include",
+      });
+    }
 
     if (response.ok) {
-      const json = await response.json();
+      const json = await response.json() as SyncedDBResponse<T>;
       const store = this.#getStore("readwrite");
-      const items = json.changed.map((item: any) =>
+      const items = json.changed.map((item) =>
         this.#addSyncState(item, "none", "synced")
       );
 
@@ -230,6 +345,7 @@ export class SyncedDB<T> {
         idbx.putBulk(store, items),
       ]);
 
+      this.dispatchEvent(new MessageEvent("synced", { data: json }));
       this.lastSync = new Date(json.timestamp).getTime();
     } else {
       // handle error
@@ -267,14 +383,34 @@ export class SyncedDB<T> {
     const canHaveBody = method !== "GET" && method !== "DELETE";
     const body = !canHaveBody ? undefined : JSON.stringify(data);
     const url = this.#buildUrl(path, key);
-    const response = await fetch(url, {
-      method,
-      body,
-      mode: "cors",
-      credentials: "include",
-    });
 
-    console.log(response.ok, response.status);
+    let response: Response;
+    if (this.options.dryRun) {
+      const request = JSON.parse(body as string) as T;
+      let status = 200;
+      if ("POST" === method) {
+        const id = dryRunId(3);
+        request[this.options.keyName as string] = id;
+        status = 201;
+      } else if ("DELETE" === method) {
+        status = 204;
+      } else if ("PUT" === method) {
+        status = 200;
+      }
+
+      console.log(`DRY RUN: ${method} ${url}`);
+      response = new Response(JSON.stringify(request), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+    } else {
+      response = await fetch(url, {
+        method,
+        body,
+        mode: "cors",
+        credentials: "include",
+      });
+    }
 
     if (response.ok) {
       const store = this.#getStore("readwrite");
