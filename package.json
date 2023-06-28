@@ -20,11 +20,11 @@
   "author": "Mario Stöcklein <mstoecklein@xp.live>",
   "license": "MIT",
   "devDependencies": {
-    "esbuild": "^0.18.8",
+    "esbuild": "^0.18.10",
     "rimraf": "^5.0.1",
-    "typescript": "^5.1.3"
+    "typescript": "^5.1.5"
   },
   "dependencies": {
-    "idbx": "^1.0.4"
+    "idbx": "^1.0.6"
   }
 }
