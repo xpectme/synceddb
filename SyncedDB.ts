@@ -58,10 +58,13 @@ export class SyncedDB<T extends SyncedDBInfo>
     storeName: string,
     options?: IDBObjectStoreParameters,
   ) {
-    const store = db.createObjectStore(storeName, options ?? {
-      keyPath: "id",
-      autoIncrement: false,
-    });
+    const store = db.createObjectStore(
+      storeName,
+      options ?? {
+        keyPath: "id",
+        autoIncrement: false,
+      },
+    );
     store.createIndex("syncState", "sync_state", { unique: false });
     store.createIndex("syncAction", "sync_action", { unique: false });
     return store;
@@ -108,8 +111,11 @@ export class SyncedDB<T extends SyncedDBInfo>
   async create(data: T) {
     const store = this.#getStore("readwrite");
     const item = this.#addSyncState(data, "create", "unsynced");
-    const key = "TMP-" + crypto.randomUUID();
-    item[this.options.keyName] = key;
+    let key: string | undefined;
+    if (!store.autoIncrement) {
+      key = "TMP-" + crypto.randomUUID();
+      item[this.options.keyName] = key;
+    }
     await idbx.add(store, item);
 
     if (navigator.onLine) {
@@ -132,7 +138,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       forceSync = true;
     }
 
-    if (navigator.onLine && !key.startsWith("TMP-") && forceSync) {
+    if (navigator.onLine && result.sync_action === "create" || navigator.onLine && forceSync) {
       const path = this.options.readPath;
       const result = await this.#fetchOne("GET", path, undefined, key);
       this.dispatchEvent(new MessageEvent("read", { data: result }));
@@ -167,17 +173,17 @@ export class SyncedDB<T extends SyncedDBInfo>
   // create a method that deletes from the indexeddb store and send a fetch
   // request to the server to update the database on the server
   async delete(key: string) {
+    const read = this.#getStore("readonly");
+    const record = await idbx.get<T>(read, key);
+
     // check if the record is already registered on the server.
     // If it isn't, then we can delete it from the store right now.
-    if (key.startsWith("TMP-")) {
+    if (record.sync_action === "create") {
       // delete the record
       const store = this.#getStore("readwrite");
       await idbx.del(store, key);
       return;
     }
-
-    const read = this.#getStore("readonly");
-    const record = await idbx.get<T>(read, key);
 
     const store = this.#getStore("readwrite");
     const item = this.#addSyncState(record as T, "delete", "unsynced");
@@ -226,9 +232,7 @@ export class SyncedDB<T extends SyncedDBInfo>
         await idbx.putBulk(store, items);
 
         // add the TMP- items to the items array
-        const tmpItems = result.filter((item) =>
-          item[this.options.keyName].startsWith("TMP-")
-        );
+        const tmpItems = result.filter((item) => item.sync_action === "create");
         result = [...items, ...tmpItems] as T[];
       } else {
         // handle error
@@ -370,9 +374,9 @@ export class SyncedDB<T extends SyncedDBInfo>
     return tx.objectStore(this.storeName);
   }
 
-  #buildUrl(path: string, key: string) {
+  #buildUrl(path: string, key: string | null = null) {
     const url = new URL(this.options.url + path);
-    if (!key.startsWith("TMP-")) {
+    if (key) {
       url.searchParams.set(this.options.keyName as string, key);
     }
     return url;
@@ -382,7 +386,7 @@ export class SyncedDB<T extends SyncedDBInfo>
     method: string,
     path: string,
     data: T | undefined,
-    key: string,
+    key: string | null = null,
   ) => {
     const canHaveBody = method !== "GET" && method !== "DELETE";
     const body = !canHaveBody ? undefined : JSON.stringify(data);
