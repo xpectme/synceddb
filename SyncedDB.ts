@@ -393,7 +393,7 @@ export class SyncedDB<T extends SyncedDBInfo>
 
     let response: Response;
     if (this.options.testRun) {
-      const request = JSON.parse(body as string) as T;
+      const request = body ? JSON.parse(body as string) as T : "";
       let status = 200;
       if ("POST" === method) {
         const id = testRunId(3);
