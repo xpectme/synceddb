@@ -118,11 +118,11 @@ export class SyncedDB<T extends SyncedDBInfo>
     let key: IDBValidKey;
     if (store.autoIncrement) {
       key = await idbx.add(store, item);
-      item[this.options.keyName] = key;
+      data[this.options.keyName] = key;
       console.log("key", key);
     } else {
       key = "TMP-" + crypto.randomUUID();
-      item[this.options.keyName] = key;
+      data[this.options.keyName] = item[this.options.keyName] = key;
       await idbx.add(store, item);
     }
 
@@ -438,7 +438,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       console.log(`TEST RUN: ${method} ${url}`);
       response = new Response(responseBody, { status, headers });
     } else {
-      response = await fetch(url, {
+      response = await fetch(url.toString(), {
         method,
         body,
         mode: "cors",

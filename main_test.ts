@@ -71,7 +71,7 @@ const fillDB = async (db: IDBDatabase) => {
 const createPOSTRoute = (item: TestStore | TestAutoIncrementStore) => {
   mf.mock("POST@/api/create", async (req) => {
     const actualBody = await req.json();
-    const expectedBody = { name: "test" };
+    const expectedBody = item;
 
     assertEquals(actualBody, expectedBody);
     return new Response(JSON.stringify(item), { status: 201 });
@@ -81,7 +81,7 @@ const createPOSTRoute = (item: TestStore | TestAutoIncrementStore) => {
 const createPUTRoute = (item: TestStore | TestAutoIncrementStore) => {
   mf.mock("PUT@/api/update", async (req) => {
     const actualBody = await req.json();
-    const expectedBody = { id: "1", name: "test" };
+    const expectedBody = item;
 
     assertEquals(actualBody, expectedBody);
     return new Response(JSON.stringify(item), { status: 200 });
@@ -111,10 +111,7 @@ const createGETRoute = (item: TestStore | TestAutoIncrementStore) => {
 
 const createGETALLRoute = (items: TestStore[] | TestAutoIncrementStore[]) => {
   mf.mock("GET@/api/read_all", () => {
-    return new Response(
-      JSON.stringify(items),
-      { status: 200 },
-    );
+    return new Response(JSON.stringify(items), { status: 200 });
   });
 };
 
@@ -213,12 +210,7 @@ Deno.test("SyncedDB.create online", async () => {
   (navigator as any).onLine = true;
   const db = await createDB();
 
-  createPOSTRoute({
-    id: "TMP-1",
-    name: "test",
-    sync_action: "none",
-    sync_state: "synced",
-  });
+  createPOSTRoute({ id: "TMP-1", name: "test" });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
   const data: TestStore = { name: "test" };
@@ -267,8 +259,6 @@ Deno.test("SyncedDB.create with autoIncrement", async () => {
     // CAUTION! AutoIncrement Key is a number!
     id: 1,
     name: "test",
-    sync_action: "none",
-    sync_state: "synced",
   });
 
   const syncdb = new SyncedDB<TestAutoIncrementStore>(db, "test", syncOptions);
@@ -296,8 +286,6 @@ Deno.test("SyncedDB.update online", async () => {
   createPUTRoute({
     id: "1",
     name: "test",
-    sync_action: "none",
-    sync_state: "synced",
   });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
@@ -324,8 +312,6 @@ Deno.test("SyncedDB.update offline", async () => {
   createPUTRoute({
     id: "1",
     name: "test",
-    sync_action: "update",
-    sync_state: "unsynced",
   });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
@@ -353,8 +339,6 @@ Deno.test("SyncedDB.delete online", async () => {
   createPOSTRoute({
     id: "TMP-1",
     name: "test",
-    sync_action: "none",
-    sync_state: "synced",
   });
 
   createDELETERoute("TMP-1");
@@ -388,8 +372,6 @@ Deno.test("SyncedDB.delete offline with ID", async () => {
   createPOSTRoute({
     id: "TMP-1",
     name: "test",
-    sync_action: "none",
-    sync_state: "synced",
   });
 
   createDELETERoute("TMP-1");
@@ -427,8 +409,6 @@ Deno.test("SyncedDB.delete offline with temporary ID", async () => {
   createPOSTRoute({
     id: "TMP-1",
     name: "test",
-    sync_action: "none",
-    sync_state: "synced",
   });
 
   createDELETERoute("TMP-1");
@@ -462,8 +442,6 @@ Deno.test("SyncedDB.read online", async () => {
   createGETRoute({
     id: "1",
     name: "test",
-    sync_action: "none",
-    sync_state: "synced",
   });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
@@ -490,8 +468,6 @@ Deno.test("SyncedDB.read online/sync/update", async () => {
   createGETRoute({
     id: "2",
     name: "test2",
-    sync_action: "none",
-    sync_state: "synced",
   });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
