@@ -138,7 +138,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       forceSync = true;
     }
 
-    if (navigator.onLine && result.sync_action === "create" || navigator.onLine && forceSync) {
+    if (navigator.onLine && result?.sync_action === "create" || navigator.onLine && forceSync) {
       const path = this.options.readPath;
       const result = await this.#fetchOne("GET", path, undefined, key);
       this.dispatchEvent(new MessageEvent("read", { data: result }));
@@ -178,7 +178,7 @@ export class SyncedDB<T extends SyncedDBInfo>
 
     // check if the record is already registered on the server.
     // If it isn't, then we can delete it from the store right now.
-    if (record.sync_action === "create") {
+    if (record?.sync_action === "create") {
       // delete the record
       const store = this.#getStore("readwrite");
       await idbx.del(store, key);
@@ -422,7 +422,7 @@ export class SyncedDB<T extends SyncedDBInfo>
 
     if (response.ok) {
       const store = this.#getStore("readwrite");
-      if (method === "DELETE") {
+      if (method === "DELETE" && key) {
         await idbx.del(store, key);
         return;
       } else {
@@ -432,8 +432,10 @@ export class SyncedDB<T extends SyncedDBInfo>
         return item as T;
       }
     } else if (response.status === 404) {
-      const store = this.#getStore("readwrite");
-      await idbx.del(store, key);
+      if (key) {
+        const store = this.#getStore("readwrite");
+        await idbx.del(store, key);
+      }
     } else {
       // handle error
       console.log("read/write/delete entry failed", response);
