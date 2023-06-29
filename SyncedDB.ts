@@ -393,20 +393,24 @@ export class SyncedDB<T extends SyncedDBInfo>
 
     let response: Response;
     if (this.options.testRun) {
-      const responseBody = body
-        ? JSON.stringify(JSON.parse(body))
-        : "";
+      let responseBody = body ? JSON.parse(body) : null;
       let status = 200;
       const headers = new Headers({ "Content-Type": "application/json" });
       if ("POST" === method) {
         const id = testRunId(3);
-        responseBody[this.options.keyName] = id;
+        if (responseBody !== null && this.options.keyName in responseBody) {
+          responseBody[this.options.keyName] = id;
+        }
         status = 201;
       } else if ("DELETE" === method) {
         status = 204;
         headers.delete("Content-Type");
       } else if ("PUT" === method) {
         status = 200;
+      }
+
+      if (responseBody !== null) {
+        responseBody = JSON.stringify(responseBody);
       }
 
       console.log(`TEST RUN: ${method} ${url}`);
