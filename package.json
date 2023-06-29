@@ -1,6 +1,6 @@
 {
   "name": "@xplive/synceddb",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "No-bullshit indexedDB wrapper functions with promises, iterators and shortcuts.",
   "types": "dest/synceddb.d.ts",
   "module": "dest/synceddb.js",
@@ -8,6 +8,10 @@
   "main": "dest/synceddb.js",
   "type": "module",
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xpectme/synceddb"
+  },
   "scripts": {
     "ts-types": " tsc --emitDeclarationOnly",
     "replaceDts": "find dest -type f -name \"*.d.ts\" -exec sh -c 'sed \"s/\\.ts/\\.d.ts/g\" \"$0\" > \"$0.tmp\" && mv \"$0.tmp\" \"$0\"' {} \\;",
