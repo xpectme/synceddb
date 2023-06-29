@@ -68,6 +68,7 @@ export class SyncedDB<T extends SyncedDBInfo>
         ...options,
       },
     );
+    store.createIndex("primaryKey", "id", { unique: true });
     store.createIndex("syncState", "sync_state", { unique: false });
     store.createIndex("syncAction", "sync_action", { unique: false });
     return store;
@@ -233,16 +234,32 @@ export class SyncedDB<T extends SyncedDBInfo>
 
       if (response.ok) {
         const json: T[] = await response.json() ?? [];
-        const store = this.#getStore("readwrite");
         const items = (json ?? []).map((item) =>
           this.#addSyncState(item, "none", "synced")
         );
 
-        await idbx.putBulk(store, items);
+        const deletables = result
+          .filter(
+            (item) =>
+              !items.some((i) =>
+                i[this.options.keyName] === item[this.options.keyName]
+              ),
+          ).map((item) => item[this.options.keyName]);
 
-        // add the TMP- items to the items array
-        const tmpItems = result.filter((item) => item.sync_action === "create");
-        result = [...items, ...tmpItems] as T[];
+        const updatables = items.filter((item) =>
+          result.some((i) =>
+            i[this.options.keyName] === item[this.options.keyName]
+          )
+        );
+
+        await idbx.batch(this.db, [
+          { method: "del", keys: deletables, storeName: this.storeName },
+          { method: "put", data: updatables, storeName: this.storeName },
+        ], "readwrite").completed;
+
+        result = await idbx.getAll<T>(this.#getStore("readonly"));
+        this.dispatchEvent(new MessageEvent("readAll", { data: result }));
+        return result as T[];
       } else {
         // handle error
         console.log("fetch entries failed", response);
@@ -436,12 +453,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       } else {
         const json = await response.json();
         const item = this.#addSyncState(json, "none", "synced");
-        const store = this.#getStore("readwrite");
-        if (store.autoIncrement) {
-          await idbx.put(this.#getStore("readwrite"), item);
-        } else {
-          await idbx.put(this.#getStore("readwrite"), item, key);
-        }
+        await idbx.put(this.#getStore("readwrite"), item);
         return item as T;
       }
     } else if (response.status === 404) {

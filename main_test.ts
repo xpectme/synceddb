@@ -4,6 +4,8 @@ import {
   assert,
   assertEquals,
 } from "https://deno.land/std@0.192.0/testing/asserts.ts";
+import { stub } from "https://deno.land/std@0.192.0/testing/mock.ts";
+
 import * as idbx from "https://deno.land/x/idbx@v1.0.4/mod.ts";
 import * as mf from "https://deno.land/x/mock_fetch@0.3.0/mod.ts";
 
@@ -20,6 +22,17 @@ interface TestAutoIncrementStore extends SyncedDBInfo {
   id?: number;
   name: string;
 }
+
+let uuidCounter = 1;
+stub(crypto, "randomUUID", () => `${uuidCounter++}` as any);
+
+const resetRandomUUID = () => uuidCounter = 1;
+
+const getCount = async (db: IDBDatabase) => {
+  const store = db.transaction("test").objectStore("test");
+  const count = await idbx.count(store);
+  return count;
+};
 
 const createDB = (options?: IDBObjectStoreParameters) => {
   const dbreq = idbx.open("testdb", 1);
@@ -55,6 +68,56 @@ const fillDB = async (db: IDBDatabase) => {
   ]);
 };
 
+const createPOSTRoute = (item: TestStore | TestAutoIncrementStore) => {
+  mf.mock("POST@/api/create", async (req) => {
+    const actualBody = await req.json();
+    const expectedBody = { name: "test" };
+
+    assertEquals(actualBody, expectedBody);
+    return new Response(JSON.stringify(item), { status: 201 });
+  });
+};
+
+const createPUTRoute = (item: TestStore | TestAutoIncrementStore) => {
+  mf.mock("PUT@/api/update", async (req) => {
+    const actualBody = await req.json();
+    const expectedBody = { id: "1", name: "test" };
+
+    assertEquals(actualBody, expectedBody);
+    return new Response(JSON.stringify(item), { status: 200 });
+  });
+};
+
+const createDELETERoute = (id: string | number) => {
+  mf.mock("DELETE@/api/delete", (req) => {
+    const actual = new URL(req.url).searchParams.get("id");
+    const expected = id;
+
+    assertEquals(actual, expected);
+    return new Response(undefined, { status: 204 });
+  });
+};
+
+const createGETRoute = (item: TestStore | TestAutoIncrementStore) => {
+  mf.mock("GET@/api/read", (req) => {
+    const url = new URL(req.url);
+    const actual = url.searchParams.get("id");
+    const expected = item.id;
+
+    assertEquals(actual, expected);
+    return new Response(JSON.stringify(item), { status: 200 });
+  });
+};
+
+const createGETALLRoute = (items: TestStore[] | TestAutoIncrementStore[]) => {
+  mf.mock("GET@/api/read_all", () => {
+    return new Response(
+      JSON.stringify(items),
+      { status: 200 },
+    );
+  });
+};
+
 const createRoutes = () => {
   mf.mock("POST@/api/create", async (req) => {
     const actualBody = await req.json();
@@ -63,7 +126,7 @@ const createRoutes = () => {
     assertEquals(actualBody, expectedBody);
     return new Response(
       JSON.stringify({
-        id: "1",
+        id: "TMP-1",
         name: "test",
         sync_action: "none",
         sync_state: "synced",
@@ -79,7 +142,7 @@ const createRoutes = () => {
     assertEquals(actualBody, expectedBody);
     return new Response(
       JSON.stringify({
-        id: "1",
+        id: "TMP-1",
         name: "test",
         sync_action: "none",
         sync_state: "synced",
@@ -90,7 +153,7 @@ const createRoutes = () => {
 
   mf.mock("DELETE@/api/delete", (req) => {
     const actual = new URL(req.url).searchParams.get("id");
-    const expected = "1";
+    const expected = "TMP-1";
 
     assertEquals(actual, expected);
     return new Response(undefined, { status: 204 });
@@ -99,12 +162,12 @@ const createRoutes = () => {
   mf.mock("GET@/api/read", (req) => {
     const url = new URL(req.url);
     const actual = url.searchParams.get("id");
-    const expected = "1";
+    const expected = "TMP-1";
 
     assertEquals(actual, expected);
     return new Response(
       JSON.stringify({
-        id: "1",
+        id: "TMP-1",
         name: "test",
         sync_action: "none",
         sync_state: "synced",
@@ -117,13 +180,13 @@ const createRoutes = () => {
     return new Response(
       JSON.stringify([
         {
-          id: "1",
+          id: "TMP-1",
           name: "test",
           sync_action: "none",
           sync_state: "synced",
         },
         {
-          id: "2",
+          id: "TMP-2",
           name: "test2",
           sync_action: "none",
           sync_state: "synced",
@@ -149,75 +212,68 @@ const syncOptions = {
 Deno.test("SyncedDB.create online", async () => {
   (navigator as any).onLine = true;
   const db = await createDB();
-  createRoutes();
 
-  const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
-  const data: TestStore = { name: "test" };
-  const result = await syncdb.create(data);
-  assertEquals(result, {
-    id: "1",
+  createPOSTRoute({
+    id: "TMP-1",
     name: "test",
     sync_action: "none",
     sync_state: "synced",
   });
 
+  const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
+  const data: TestStore = { name: "test" };
+  const result = await syncdb.create(data);
+  assertEquals(result, {
+    id: "TMP-1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
+
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.create offline", async () => {
   (navigator as any).onLine = false;
   const db = await createDB();
-  createRoutes();
-
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
   const data: TestStore = { name: "test" };
   const result = await syncdb.create(data);
 
-  assert(result.id.startsWith("TMP-"), "id should be a temporary id");
-
-  const id = result.id;
+  assertEquals(result.id, "TMP-1", "id should be a temporary id");
   assertEquals(result, {
-    id,
+    id: "TMP-1",
     name: "test",
     sync_action: "create",
     sync_state: "unsynced",
   });
 
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.create with autoIncrement", async () => {
   (navigator as any).onLine = true;
   const db = await createDB({ autoIncrement: true });
 
-  mf.mock("POST@/api/create", async (req) => {
-    const actualBody = await req.json();
-    const expectedBody = { name: "test" };
-
-    assertEquals(actualBody, expectedBody);
-    return new Response(
-      JSON.stringify({
-        // CAUTION! AutoIncrement Key is a number!
-        id: 1,
-        name: "test",
-        sync_action: "none",
-        sync_state: "synced",
-      }),
-      { status: 201 },
-    );
+  createPOSTRoute({
+    // CAUTION! AutoIncrement Key is a number!
+    id: 1,
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
   });
 
   const syncdb = new SyncedDB<TestAutoIncrementStore>(db, "test", syncOptions);
   const data: TestAutoIncrementStore = { name: "test" };
   const result = await syncdb.create(data);
-
-  const store = db.transaction("test").objectStore("test");
-  const count = await idbx.count(store);
-
-  // should have 1 item in the db
-  assertEquals(count, 1);
 
   assertEquals(result, {
     id: 1,
@@ -226,14 +282,23 @@ Deno.test("SyncedDB.create with autoIncrement", async () => {
     sync_state: "synced",
   });
 
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.update online", async () => {
   (navigator as any).onLine = true;
   const db = await createDB();
-  createRoutes();
+
+  createPUTRoute({
+    id: "1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
   const data: TestStore = { id: "1", name: "test" };
@@ -245,14 +310,23 @@ Deno.test("SyncedDB.update online", async () => {
     sync_state: "synced",
   });
 
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.update offline", async () => {
   (navigator as any).onLine = false;
   const db = await createDB();
-  createRoutes();
+
+  createPUTRoute({
+    id: "1",
+    name: "test",
+    sync_action: "update",
+    sync_state: "unsynced",
+  });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
 
@@ -265,38 +339,60 @@ Deno.test("SyncedDB.update offline", async () => {
     sync_state: "unsynced",
   });
 
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.delete online", async () => {
   (navigator as any).onLine = true;
   const db = await createDB();
-  createRoutes();
+
+  createPOSTRoute({
+    id: "TMP-1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
+
+  createDELETERoute("TMP-1");
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
 
   // create a record
   const item = await syncdb.create({ name: "test" });
   assertEquals(item, {
-    id: "1",
+    id: "TMP-1",
     name: "test",
     sync_action: "none",
     sync_state: "synced",
   });
 
   // delete the record
-  const result = await syncdb.delete("1");
+  const result = await syncdb.delete("TMP-1");
   assertEquals(result, undefined);
+
+  assertEquals(await getCount(db), 0, "should have 0 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.delete offline with ID", async () => {
   (navigator as any).onLine = true;
   const db = await createDB();
-  createRoutes();
+
+  createPOSTRoute({
+    id: "TMP-1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
+
+  createDELETERoute("TMP-1");
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
 
@@ -317,14 +413,25 @@ Deno.test("SyncedDB.delete offline with ID", async () => {
     sync_state: "unsynced",
   });
 
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.delete offline with temporary ID", async () => {
   (navigator as any).onLine = false;
   const db = await createDB();
-  createRoutes();
+
+  createPOSTRoute({
+    id: "TMP-1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
+
+  createDELETERoute("TMP-1");
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
 
@@ -340,15 +447,24 @@ Deno.test("SyncedDB.delete offline with temporary ID", async () => {
   const result = await syncdb.read(id);
   assertEquals(result, undefined);
 
+  assertEquals(await getCount(db), 0, "should have 0 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.read online", async () => {
   (navigator as any).onLine = true;
   const db = await createDB();
   await fillDB(db);
-  createRoutes();
+
+  createGETRoute({
+    id: "1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
   const item1 = await syncdb.read("1");
@@ -359,8 +475,11 @@ Deno.test("SyncedDB.read online", async () => {
     sync_state: "synced",
   }, "item flagged as synced should be returned");
 
+  assertEquals(await getCount(db), 4, "should have 4 items in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.read online/sync/update", async () => {
@@ -368,15 +487,11 @@ Deno.test("SyncedDB.read online/sync/update", async () => {
   const db = await createDB();
   await fillDB(db);
 
-  mf.mock("GET@/api/read", (req) => {
-    const url = new URL(req.url);
-    assertEquals(url.searchParams.get("id"), "2");
-    return new Response(JSON.stringify({
-      id: "2",
-      name: "test2",
-      sync_action: "none",
-      sync_state: "synced",
-    }));
+  createGETRoute({
+    id: "2",
+    name: "test2",
+    sync_action: "none",
+    sync_state: "synced",
   });
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
@@ -396,8 +511,11 @@ Deno.test("SyncedDB.read online/sync/update", async () => {
     sync_state: "synced",
   });
 
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
+
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.read online/sync/delete", async () => {
@@ -422,9 +540,11 @@ Deno.test("SyncedDB.read online/sync/delete", async () => {
 
   const item3Deleted = await syncdb.read("3", true);
   assertEquals(item3Deleted, undefined, "item must be deleted");
+  assertEquals(await getCount(db), 3, "should have 3 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.read offline", async () => {
@@ -441,9 +561,11 @@ Deno.test("SyncedDB.read offline", async () => {
     sync_action: "none",
     sync_state: "synced",
   });
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.read offline/sync/update", async () => {
@@ -467,9 +589,11 @@ Deno.test("SyncedDB.read offline/sync/update", async () => {
     sync_action: "none",
     sync_state: "synced",
   }, "item must not be changed");
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.read offline/sync/delete", async () => {
@@ -493,9 +617,11 @@ Deno.test("SyncedDB.read offline/sync/delete", async () => {
     sync_action: "none",
     sync_state: "synced",
   }, "item must not be deleted");
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.readAll online", async () => {
@@ -532,43 +658,38 @@ Deno.test("SyncedDB.readAll online", async () => {
       sync_state: "unsynced",
     },
   ], "all items flagged as synced should be returned");
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.readAll online/sync", async () => {
   (navigator as any).onLine = true;
   const db = await createDB();
   await fillDB(db);
-  createRoutes();
+
+  createGETALLRoute([
+    { id: "1", name: "test" },
+    { id: "2", name: "test2" },
+    { id: "TMP-1", name: "test" },
+  ]);
 
   const syncdb = new SyncedDB<TestStore>(db, "test", syncOptions);
   const items = await syncdb.readAll(true);
   assertEquals(items, [
-    {
-      id: "1",
-      name: "test",
-      sync_action: "none",
-      sync_state: "synced",
-    },
-    {
-      id: "2",
-      name: "test2",
-      sync_action: "none",
-      sync_state: "synced",
-    },
+    { id: "1", name: "test", sync_action: "none", sync_state: "synced" },
+    { id: "2", name: "test2", sync_action: "none", sync_state: "synced" },
     // ID 3 is deleted
-    {
-      id: "TMP-1",
-      name: "test",
-      sync_action: "create",
-      sync_state: "unsynced",
-    },
+    // ID TMP-1 will be added to the server
+    { id: "TMP-1", name: "test", sync_action: "none", sync_state: "synced" },
   ]);
+  assertEquals(await getCount(db), 3, "should have 3 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.readAll offline", async () => {
@@ -605,9 +726,11 @@ Deno.test("SyncedDB.readAll offline", async () => {
       sync_state: "unsynced",
     },
   ]);
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 const createSyncItems = async (db: IDBDatabase) => {
@@ -695,9 +818,11 @@ Deno.test("SyncedDB.sync()", async () => {
     { id: "2", name: "test2", sync_action: "none", sync_state: "synced" },
     { id: "4", name: "test4", sync_action: "none", sync_state: "synced" },
   ]);
+  assertEquals(await getCount(db), 3, "should have 3 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB.sync() offline", async () => {
@@ -721,9 +846,11 @@ Deno.test("SyncedDB.sync() offline", async () => {
       sync_state: "unsynced",
     },
   ]);
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
 
 Deno.test("SyncedDB AutoSync toggle from offline to online", async () => {
@@ -749,6 +876,7 @@ Deno.test("SyncedDB AutoSync toggle from offline to online", async () => {
       sync_state: "unsynced",
     },
   ]);
+  assertEquals(await getCount(db), 4, "should have 4 item in the db");
 
   (navigator as any).onLine = true;
   globalThis.dispatchEvent(new Event("online"));
@@ -762,7 +890,9 @@ Deno.test("SyncedDB AutoSync toggle from offline to online", async () => {
     { id: "2", name: "test2", sync_action: "none", sync_state: "synced" },
     { id: "4", name: "test4", sync_action: "none", sync_state: "synced" },
   ]);
+  assertEquals(await getCount(db), 3, "should have 3 item in the db");
 
   clearDB(db);
   removeRoutes();
+  resetRandomUUID();
 });
