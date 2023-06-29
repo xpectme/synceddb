@@ -251,6 +251,30 @@ Deno.test("SyncedDB.create offline", async () => {
   resetRandomUUID();
 });
 
+Deno.test("SyncedDB.create (test mode)", async () => {
+  (navigator as any).onLine = true;
+  const db = await createDB();
+
+  const syncdb = new SyncedDB<TestStore>(db, "test", {
+    ...syncOptions,
+    testRun: true,
+  });
+  const data: TestStore = { name: "test" };
+  const result = await syncdb.create(data);
+  assertEquals(result, {
+    id: "TMP-1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
+
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
+  clearDB(db);
+  removeRoutes();
+  resetRandomUUID();
+});
+
 Deno.test("SyncedDB.create with autoIncrement", async () => {
   (navigator as any).onLine = true;
   const db = await createDB({ autoIncrement: true });
@@ -323,6 +347,30 @@ Deno.test("SyncedDB.update offline", async () => {
     name: "test",
     sync_action: "update",
     sync_state: "unsynced",
+  });
+
+  assertEquals(await getCount(db), 1, "should have 1 item in the db");
+
+  clearDB(db);
+  removeRoutes();
+  resetRandomUUID();
+});
+
+Deno.test("SyncedDB.update online (test mode)", async () => {
+  (navigator as any).onLine = true;
+  const db = await createDB();
+
+  const syncdb = new SyncedDB<TestStore>(db, "test", {
+    ...syncOptions,
+    testRun: true,
+  });
+  const data: TestStore = { id: "1", name: "test" };
+  const result = await syncdb.update(data);
+  assertEquals(result, {
+    id: "1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
   });
 
   assertEquals(await getCount(db), 1, "should have 1 item in the db");
@@ -425,6 +473,42 @@ Deno.test("SyncedDB.delete offline with temporary ID", async () => {
   await syncdb.delete(id);
 
   const result = await syncdb.read(id);
+  assertEquals(result, undefined);
+
+  assertEquals(await getCount(db), 0, "should have 0 item in the db");
+
+  clearDB(db);
+  removeRoutes();
+  resetRandomUUID();
+});
+
+Deno.test("SyncedDB.delete online (test mode)", async () => {
+  (navigator as any).onLine = true;
+  const db = await createDB();
+
+  createPOSTRoute({
+    id: "TMP-1",
+    name: "test",
+  });
+
+  createDELETERoute("TMP-1");
+
+  const syncdb = new SyncedDB<TestStore>(db, "test", {
+    ...syncOptions,
+    testRun: true,
+  });
+
+  // create a record
+  const item = await syncdb.create({ name: "test" });
+  assertEquals(item, {
+    id: "TMP-1",
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
+  });
+
+  // delete the record
+  const result = await syncdb.delete("TMP-1");
   assertEquals(result, undefined);
 
   assertEquals(await getCount(db), 0, "should have 0 item in the db");

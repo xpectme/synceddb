@@ -419,7 +419,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       let status = 200;
       const headers = new Headers({ "Content-Type": "application/json" });
       if ("POST" === method) {
-        const id = testRunId(3);
+        const id = key ?? testRunId(3);
         if (responseBody !== null && this.options.keyName in responseBody) {
           responseBody[this.options.keyName] = id;
         }
