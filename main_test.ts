@@ -16,13 +16,18 @@ interface TestStore extends SyncedDBInfo {
   name: string;
 }
 
-const createDB = () => {
+interface TestAutoIncrementStore extends SyncedDBInfo {
+  id?: number;
+  name: string;
+}
+
+const createDB = (options?: IDBObjectStoreParameters) => {
   const dbreq = idbx.open("testdb", 1);
 
   dbreq.upgrade((event) => {
     const target = event.target as IDBOpenDBRequest;
     const db = target.result;
-    SyncedDB.createStore(db, "test");
+    SyncedDB.createStore(db, "test", options);
   });
 
   return dbreq.ready;
@@ -177,6 +182,48 @@ Deno.test("SyncedDB.create offline", async () => {
     name: "test",
     sync_action: "create",
     sync_state: "unsynced",
+  });
+
+  clearDB(db);
+  removeRoutes();
+});
+
+Deno.test("SyncedDB.create with autoIncrement", async () => {
+  (navigator as any).onLine = true;
+  const db = await createDB({ autoIncrement: true });
+
+  mf.mock("POST@/api/create", async (req) => {
+    const actualBody = await req.json();
+    const expectedBody = { name: "test" };
+
+    assertEquals(actualBody, expectedBody);
+    return new Response(
+      JSON.stringify({
+        // CAUTION! AutoIncrement Key is a number!
+        id: 1,
+        name: "test",
+        sync_action: "none",
+        sync_state: "synced",
+      }),
+      { status: 201 },
+    );
+  });
+
+  const syncdb = new SyncedDB<TestAutoIncrementStore>(db, "test", syncOptions);
+  const data: TestAutoIncrementStore = { name: "test" };
+  const result = await syncdb.create(data);
+
+  const store = db.transaction("test").objectStore("test");
+  const count = await idbx.count(store);
+
+  // should have 1 item in the db
+  assertEquals(count, 1);
+
+  assertEquals(result, {
+    id: 1,
+    name: "test",
+    sync_action: "none",
+    sync_state: "synced",
   });
 
   clearDB(db);

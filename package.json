@@ -1,6 +1,6 @@
 {
   "name": "@xplive/synceddb",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "No-bullshit indexedDB wrapper functions with promises, iterators and shortcuts.",
   "types": "dest/synceddb.d.ts",
   "module": "dest/synceddb.js",

@@ -62,9 +62,10 @@ export class SyncedDB<T extends SyncedDBInfo>
   ) {
     const store = db.createObjectStore(
       storeName,
-      options ?? {
+      {
         keyPath: "id",
         autoIncrement: false,
+        ...options,
       },
     );
     store.createIndex("syncState", "sync_state", { unique: false });
@@ -113,12 +114,16 @@ export class SyncedDB<T extends SyncedDBInfo>
   async create(data: T) {
     const store = this.#getStore("readwrite");
     const item = this.#addSyncState(data, "create", "unsynced");
-    let key: string | undefined;
-    if (!store.autoIncrement) {
+    let key: IDBValidKey;
+    if (store.autoIncrement) {
+      key = await idbx.add(store, item);
+      item[this.options.keyName] = key;
+      console.log("key", key);
+    } else {
       key = "TMP-" + crypto.randomUUID();
       item[this.options.keyName] = key;
+      await idbx.add(store, item);
     }
-    await idbx.add(store, item);
 
     if (navigator.onLine) {
       const path = this.options.createPath;
@@ -373,10 +378,10 @@ export class SyncedDB<T extends SyncedDBInfo>
     return tx.objectStore(this.storeName);
   }
 
-  #buildUrl(path: string, key: string | null = null) {
+  #buildUrl(path: string, key?: IDBValidKey | undefined) {
     const url = new URL(this.options.url + path);
     if (key) {
-      url.searchParams.set(this.options.keyName as string, key);
+      url.searchParams.set(this.options.keyName as string, key.toString());
     }
     return url;
   }
@@ -385,7 +390,7 @@ export class SyncedDB<T extends SyncedDBInfo>
     method: string,
     path: string,
     data: T | undefined,
-    key: string | null = null,
+    key?: IDBValidKey | undefined,
   ) => {
     const canHaveBody = method !== "GET" && method !== "DELETE";
     const body = !canHaveBody ? undefined : JSON.stringify(data);
@@ -431,7 +436,12 @@ export class SyncedDB<T extends SyncedDBInfo>
       } else {
         const json = await response.json();
         const item = this.#addSyncState(json, "none", "synced");
-        await idbx.put(this.#getStore("readwrite"), item);
+        const store = this.#getStore("readwrite");
+        if (store.autoIncrement) {
+          await idbx.put(this.#getStore("readwrite"), item);
+        } else {
+          await idbx.put(this.#getStore("readwrite"), item, key);
+        }
         return item as T;
       }
     } else if (response.status === 404) {
