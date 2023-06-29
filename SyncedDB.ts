@@ -10,7 +10,7 @@ import { SyncedDBEventTarget } from "./SyncedDBEventTarget.ts";
 
 let currentTime = 0;
 let currentCount = 0;
-function dryRunId(padding = 1) {
+function testRunId(padding = 1) {
   const now = Date.now();
   if (now === currentTime) {
     currentCount++;
@@ -44,6 +44,8 @@ export interface SyncedDB<T extends SyncedDBInfo>
     callback: EventListenerOrEventListenerObject | null,
     options?: EventListenerOptions | boolean,
   ): void;
+
+  dispatchEvent(event: Event): boolean;
 }
 
 export class SyncedDB<T extends SyncedDBInfo>
@@ -91,7 +93,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       deletePath: "/api/delete",
       readAllPath: "/api/read_all",
       syncPath: "/api/sync",
-      dryRun: false,
+      testRun: false,
       ...options,
     };
     globalThis.addEventListener("online", () => {
@@ -138,7 +140,10 @@ export class SyncedDB<T extends SyncedDBInfo>
       forceSync = true;
     }
 
-    if (navigator.onLine && result?.sync_action === "create" || navigator.onLine && forceSync) {
+    if (
+      navigator.onLine && result?.sync_action === "create" ||
+      navigator.onLine && forceSync
+    ) {
       const path = this.options.readPath;
       const result = await this.#fetchOne("GET", path, undefined, key);
       this.dispatchEvent(new MessageEvent("read", { data: result }));
@@ -200,16 +205,15 @@ export class SyncedDB<T extends SyncedDBInfo>
   // create a method that reads all from the indexeddb store and send a fetch
   // request to the server to update the database on the server
   async readAll(forceSync = false) {
-    const tx = this.db.transaction(this.storeName, "readonly");
-    const store = tx.objectStore(this.storeName);
+    const store = this.#getStore("readonly");
     let result = await idbx.getAll<T>(store);
 
     if (navigator.onLine && (result.length === 0 || forceSync)) {
       const url = new URL(this.options.url + this.options.readAllPath);
 
       let response: Response;
-      if (this.options.dryRun) {
-        console.log(`DRY RUN: GET ${url}`);
+      if (this.options.testRun) {
+        console.log(`TEST RUN: GET ${url}`);
         response = new Response(JSON.stringify(result), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -254,8 +258,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       timestamp = this.lastSync;
     }
 
-    const tx = this.db.transaction(this.storeName, "readonly");
-    const store = tx.objectStore(this.storeName);
+    const store = this.#getStore("readonly");
     const index = store.index("syncState");
     const syncStore = index.objectStore;
 
@@ -293,7 +296,7 @@ export class SyncedDB<T extends SyncedDBInfo>
     url.searchParams.set("t", timestamp.toString());
 
     let response: Response;
-    if (this.options.dryRun) {
+    if (this.options.testRun) {
       // handle deletions
       let deleted: string[] = [];
       if ("delete" in groups) {
@@ -310,12 +313,12 @@ export class SyncedDB<T extends SyncedDBInfo>
       let created: T[] = [];
       if ("create" in groups) {
         created = JSON.parse(JSON.stringify(groups.create)).map((item: T) => {
-          item[key] = dryRunId(3);
+          item[key] = testRunId(3);
           return item;
         });
       }
 
-      console.log(`DRY RUN: POST ${url}`);
+      console.log(`TEST RUN: POST ${url}`);
       response = new Response(
         JSON.stringify({
           deleted,
@@ -339,19 +342,15 @@ export class SyncedDB<T extends SyncedDBInfo>
 
     if (response.ok) {
       const json = await response.json() as SyncedDBResponse<T>;
-      const store = this.#getStore("readwrite");
       const items = json.changed.map((item) =>
         this.#addSyncState(item, "none", "synced")
       );
 
-      await Promise.all([
-        // delete all items that are flagged as created on the client
-        idbx.delBulk(store, createTmpIds),
-        // delete all items that are flagged as deleted from the server
-        idbx.delBulk(store, json.deleted),
-        // update all items where sync_state is unsynced
-        idbx.putBulk(store, items),
-      ]);
+      await idbx.batch<T>(this.db, [
+        { method: "del", storeName: this.storeName, keys: createTmpIds },
+        { method: "del", storeName: this.storeName, keys: json.deleted },
+        { method: "put", storeName: this.storeName, data: items },
+      ], "readwrite").completed;
 
       this.dispatchEvent(new MessageEvent("synced", { data: json }));
       this.lastSync = new Date(json.timestamp).getTime();
@@ -393,11 +392,11 @@ export class SyncedDB<T extends SyncedDBInfo>
     const url = this.#buildUrl(path, key);
 
     let response: Response;
-    if (this.options.dryRun) {
+    if (this.options.testRun) {
       const request = JSON.parse(body as string) as T;
       let status = 200;
       if ("POST" === method) {
-        const id = dryRunId(3);
+        const id = testRunId(3);
         request[this.options.keyName as string] = id;
         status = 201;
       } else if ("DELETE" === method) {
@@ -406,7 +405,7 @@ export class SyncedDB<T extends SyncedDBInfo>
         status = 200;
       }
 
-      console.log(`DRY RUN: ${method} ${url}`);
+      console.log(`TEST RUN: ${method} ${url}`);
       response = new Response(JSON.stringify(request), {
         status,
         headers: { "Content-Type": "application/json" },
@@ -421,20 +420,18 @@ export class SyncedDB<T extends SyncedDBInfo>
     }
 
     if (response.ok) {
-      const store = this.#getStore("readwrite");
       if (method === "DELETE" && key) {
-        await idbx.del(store, key);
+        await idbx.del(this.#getStore("readwrite"), key);
         return;
       } else {
         const json = await response.json();
         const item = this.#addSyncState(json, "none", "synced");
-        await idbx.put(store, item);
+        await idbx.put(this.#getStore("readwrite"), item);
         return item as T;
       }
     } else if (response.status === 404) {
       if (key) {
-        const store = this.#getStore("readwrite");
-        await idbx.del(store, key);
+        await idbx.del(this.#getStore("readwrite"), key);
       }
     } else {
       // handle error

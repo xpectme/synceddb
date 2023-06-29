@@ -9,7 +9,7 @@ export interface SyncedDBOptions {
     deletePath: string;
     readAllPath: string;
     syncPath: string;
-    dryRun: boolean;
+    testRun: boolean;
 }
 export type SyncedDBState = "unsynced" | "synced";
 export interface SyncedDBInfo {
@@ -50,6 +50,7 @@ export interface SyncedDB<T extends SyncedDBInfo> extends SyncedDBEventTarget<T>
     addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: EventListenerOptions | boolean): void;
     removeEventListener<K extends keyof SyncedDBEventMap<T>>(type: K, listener: ((ev: SyncedDBEventMap<T>[K]) => void) | null, options?: boolean | EventListenerOptions): void;
     removeEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: EventListenerOptions | boolean): void;
+    dispatchEvent(event: Event): boolean;
 }
 declare const SyncedDB_base: {
     new (): SyncedDBEventTarget<any>;

@@ -108,7 +108,7 @@
   "npm": {
     "specifiers": {
       "esbuild@^0.18.8": "esbuild@0.18.10",
-      "idbx": "idbx@1.0.4",
+      "idbx": "idbx@1.0.7",
       "idbx@^1.0.4": "idbx@1.0.4",
       "rimraf@^5.0.1": "rimraf@5.0.1",
       "typescript@^5.1.3": "typescript@5.1.5"
@@ -321,6 +321,10 @@
       },
       "idbx@1.0.4": {
         "integrity": "sha512-P6Pa5WKK4KTFmSC0zRG8rmUCqTab8mqobFPMdwPiK42JS/ZJ1aGexmm0NLorV32wnXazLzKidpLVi+iu1LstPQ==",
+        "dependencies": {}
+      },
+      "idbx@1.0.7": {
+        "integrity": "sha512-Bp3VMBqPSxyyze/TY7mCwBWDBP41lLbsaRC7Ppq4/0aXV8ijwQqsHZ2ddv+bf2ujah9rX4F6b7RBc/x8K+uCIw==",
         "dependencies": {}
       },
       "is-fullwidth-code-point@3.0.0": {
