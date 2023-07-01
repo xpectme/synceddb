@@ -113,13 +113,12 @@ export class SyncedDB<T extends SyncedDBInfo>
   // create a method that writes into the indexeddb store and send a fetch
   // request to the server to update the database on the server
   async create(data: T) {
-    const store = this.#getStore("readwrite");
+    const store = idbx.getStore(this.db, this.storeName, "readwrite");
     const item = this.#addSyncState(data, "create", "unsynced");
     let key: IDBValidKey;
     if (store.autoIncrement) {
       key = await idbx.add(store, item);
       data[this.options.keyName] = key;
-      console.log("key", key);
     } else {
       key = "TMP-" + crypto.randomUUID();
       data[this.options.keyName] = item[this.options.keyName] = key;
@@ -138,7 +137,7 @@ export class SyncedDB<T extends SyncedDBInfo>
   // create a method that reads from the indexeddb store and send a fetch
   // request to the server to update the database on the server
   async read(key: string, forceSync = false) {
-    const store = this.#getStore("readonly");
+    const store = idbx.getStore(this.db, this.storeName);
     const result = await idbx.get<T>(store, key);
 
     if (!result) {
@@ -168,7 +167,7 @@ export class SyncedDB<T extends SyncedDBInfo>
     }
     const key = data[this.options.keyName] as string;
 
-    const store = this.#getStore("readwrite");
+    const store = idbx.getStore(this.db, this.storeName, "readwrite");
     const item = this.#addSyncState(data, "update", "unsynced");
     await idbx.put(store, item);
 
@@ -184,19 +183,19 @@ export class SyncedDB<T extends SyncedDBInfo>
   // create a method that deletes from the indexeddb store and send a fetch
   // request to the server to update the database on the server
   async delete(key: string) {
-    const read = this.#getStore("readonly");
+    const read = idbx.getStore(this.db, this.storeName);
     const record = await idbx.get<T>(read, key);
 
     // check if the record is already registered on the server.
     // If it isn't, then we can delete it from the store right now.
     if (record?.sync_action === "create") {
       // delete the record
-      const store = this.#getStore("readwrite");
+      const store = idbx.getStore(this.db, this.storeName, "readwrite");
       await idbx.del(store, key);
       return;
     }
 
-    const store = this.#getStore("readwrite");
+    const store = idbx.getStore(this.db, this.storeName, "readwrite");
     const item = this.#addSyncState(record as T, "delete", "unsynced");
     await idbx.put(store, item);
 
@@ -211,7 +210,7 @@ export class SyncedDB<T extends SyncedDBInfo>
   // create a method that reads all from the indexeddb store and send a fetch
   // request to the server to update the database on the server
   async readAll(forceSync = false) {
-    const store = this.#getStore("readonly");
+    const store = idbx.getStore(this.db, this.storeName);
     let result = await idbx.getAll<T>(store);
 
     if (navigator.onLine && (result.length === 0 || forceSync)) {
@@ -257,7 +256,8 @@ export class SyncedDB<T extends SyncedDBInfo>
           { method: "put", data: updatables, storeName: this.storeName },
         ], "readwrite").completed;
 
-        result = await idbx.getAll<T>(this.#getStore("readonly"));
+        const store = idbx.getStore(this.db, this.storeName);
+        result = await idbx.getAll<T>(store);
         this.dispatchEvent(new MessageEvent("readAll", { data: result }));
         return result as T[];
       } else {
@@ -280,7 +280,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       timestamp = this.lastSync;
     }
 
-    const store = this.#getStore("readonly");
+    const store = idbx.getStore(this.db, this.storeName);
     const index = store.index("syncState");
     const syncStore = index.objectStore;
 
@@ -364,9 +364,7 @@ export class SyncedDB<T extends SyncedDBInfo>
 
     if (response.ok) {
       const json = await response.json() as SyncedDBResponse<T>;
-      const items = json.changed.map((item) =>
-        this.#addSyncState(item, "none", "synced")
-      );
+      const items = this.#addSyncState(json.changed, "none", "synced");
 
       await idbx.batch<T>(this.db, [
         { method: "del", storeName: this.storeName, keys: createTmpIds },
@@ -383,16 +381,14 @@ export class SyncedDB<T extends SyncedDBInfo>
   }
 
   #addSyncState(
-    data: T | undefined,
+    data: T | T[] | undefined,
     sync_action: SyncedDBAction,
     sync_state: SyncedDBState,
   ) {
+    if (Array.isArray(data)) {
+      return data.map<T>((item) => ({ ...item, sync_action, sync_state } as T));
+    }
     return { ...data, sync_action, sync_state } as T;
-  }
-
-  #getStore(mode: IDBTransactionMode) {
-    const tx = this.db.transaction(this.storeName, mode);
-    return tx.objectStore(this.storeName);
   }
 
   #buildUrl(path: string, key?: IDBValidKey | undefined) {
@@ -448,17 +444,20 @@ export class SyncedDB<T extends SyncedDBInfo>
 
     if (response.ok) {
       if (method === "DELETE" && key) {
-        await idbx.del(this.#getStore("readwrite"), key);
+        const store = idbx.getStore(this.db, this.storeName, "readwrite");
+        await idbx.del(store, key);
         return;
       } else {
         const json = await response.json();
         const item = this.#addSyncState(json, "none", "synced");
-        await idbx.put(this.#getStore("readwrite"), item);
+        const store = idbx.getStore(this.db, this.storeName, "readwrite");
+        await idbx.put(store, item);
         return item as T;
       }
     } else if (response.status === 404) {
       if (key) {
-        await idbx.del(this.#getStore("readwrite"), key);
+        const store = idbx.getStore(this.db, this.storeName, "readwrite");
+        await idbx.del(store, key);
       }
     } else {
       // handle error

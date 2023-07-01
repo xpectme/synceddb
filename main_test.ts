@@ -5,9 +5,9 @@ import {
   assertEquals,
 } from "https://deno.land/std@0.192.0/testing/asserts.ts";
 import { stub } from "https://deno.land/std@0.192.0/testing/mock.ts";
-
-import * as idbx from "https://deno.land/x/idbx@v1.0.4/mod.ts";
 import * as mf from "https://deno.land/x/mock_fetch@0.3.0/mod.ts";
+
+import * as idbx from "https://esm.sh/idbx@v1.1.0";
 
 mf.install();
 
@@ -35,15 +35,12 @@ const getCount = async (db: IDBDatabase) => {
 };
 
 const createDB = (options?: IDBObjectStoreParameters) => {
-  const dbreq = idbx.open("testdb", 1);
-
-  dbreq.upgrade((event) => {
-    const target = event.target as IDBOpenDBRequest;
-    const db = target.result;
-    SyncedDB.createStore(db, "test", options);
+  return idbx.openDB("testdb", {
+    version: 1,
+    upgrade(db) {
+      SyncedDB.createStore(db, "test", options);
+    },
   });
-
-  return dbreq.ready;
 };
 
 const clearDB = (db: IDBDatabase) => {
@@ -54,8 +51,8 @@ const clearDB = (db: IDBDatabase) => {
 };
 
 const fillDB = async (db: IDBDatabase) => {
-  const store = db.transaction("test", "readwrite").objectStore("test");
-  await idbx.addBulk<TestStore>(store, [
+  const store = idbx.getStore(db, "test", "readwrite");
+  await idbx.add<TestStore>(store, [
     { id: "1", name: "test", sync_action: "none", sync_state: "synced" },
     { id: "2", name: "test", sync_action: "none", sync_state: "synced" },
     { id: "3", name: "test", sync_action: "none", sync_state: "synced" },
@@ -794,9 +791,8 @@ Deno.test("SyncedDB.readAll offline", async () => {
 });
 
 const createSyncItems = async (db: IDBDatabase) => {
-  const tx = db.transaction("test", "readwrite");
-  const store = tx.objectStore("test");
-  await idbx.addBulk(store, [
+  const store = idbx.getStore(db, "test", 'readwrite');
+  await idbx.add(store, [
     // synced entry
     { id: "1", name: "test1", sync_action: "none", sync_state: "synced" },
     // updated entry
