@@ -1,4 +1,5 @@
 import * as idbx from "npm:idbx";
+import idbatch from "npm:idbatch";
 import { SyncedDBOptions } from "./SyncedDBOptions.ts";
 import { SyncedDBAction } from "./SyncedDBAction.ts";
 import { SyncedDBState } from "./SyncedDBState.ts";
@@ -251,7 +252,7 @@ export class SyncedDB<T extends SyncedDBInfo>
           )
         );
 
-        await idbx.batch(this.db, [
+        await idbatch(this.db, [
           { method: "del", keys: deletables, storeName: this.storeName },
           { method: "put", data: updatables, storeName: this.storeName },
         ], "readwrite").completed;
@@ -366,7 +367,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       const json = await response.json() as SyncedDBResponse<T>;
       const items = this.#addSyncState(json.changed, "none", "synced");
 
-      await idbx.batch<T>(this.db, [
+      await idbatch<T>(this.db, [
         { method: "del", storeName: this.storeName, keys: createTmpIds },
         { method: "del", storeName: this.storeName, keys: json.deleted },
         { method: "put", storeName: this.storeName, data: items },

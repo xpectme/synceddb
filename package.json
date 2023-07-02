@@ -29,6 +29,7 @@
     "typescript": "^5.1.6"
   },
   "dependencies": {
-    "idbx": "^1.1.0"
+    "idbatch": "^0.0.1",
+    "idbx": "^2.0.0"
   }
 }

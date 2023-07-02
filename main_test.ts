@@ -7,7 +7,7 @@ import {
 import { stub } from "https://deno.land/std@0.192.0/testing/mock.ts";
 import * as mf from "https://deno.land/x/mock_fetch@0.3.0/mod.ts";
 
-import * as idbx from "https://esm.sh/idbx@v1.1.0";
+import * as idbx from "https://esm.sh/idbx@v2.0.0";
 
 mf.install();
 
