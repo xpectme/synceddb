@@ -9,5 +9,5 @@ build({
   minify: true,
   format: "esm",
   platform: "node",
-  external: ["npm:idbx"],
+  external: ["npm:idbx", "npm:idbatch"],
 }).catch(() => process.exit(1));

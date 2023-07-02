@@ -10,7 +10,8 @@
     "esModuleInterop": true,
     "moduleResolution": "NodeNext",
     "paths": {
-      "npm:idbx": ["./node_modules/idbx/dest/idbx.d.ts"]
+      "npm:idbx": ["./node_modules/idbx/dest/idbx.d.ts"],
+      "npm:idbatch": ["./node_modules/idbatch/dest/idbatch.d.ts"],
     }
   },
   "exclude": ["node_modules", "dest", "mod.ts", "**/*_test.ts", "esbuild.js"]
