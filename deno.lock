@@ -43,18 +43,12 @@
     "https://deno.land/x/websql@1.3.2/src/SQLResultSetRowList.ts": "d13bda459cc73bc7e4d596a0411f1e4647d1204a8fddfd42a51720a20d4bf562",
     "https://deno.land/x/websql@1.3.2/src/SQLTransaction.ts": "bda17665d54793976957af94a300834e5f07ee546d67e919f14da2a7f77fc797",
     "https://deno.land/x/websql@1.3.2/src/SQLiteDBCache.ts": "0c5a67598e39e54c317b40fff3ffc9945e5a9ed0b0c91b5d8a2b379d59c4f4a4",
-    "https://esm.sh/idbx@v1.1.0": "8470ce397de4bcf34d29f6c1aed2ee87df4883884715d183b24b036a3b1e7e38",
-    "https://esm.sh/idbx@v2.0.0": "559994e907814256c7ff70c85c31578b9631a0a2213ec46c854d5654781363e8",
-    "https://esm.sh/v127/idbx@1.1.0/deno/idbx.mjs": "c1f8160d4bd5c495c37e93abd55ca484d0079c0c2fe832447158c7dc60837550",
-    "https://esm.sh/v127/idbx@1.1.0/dest/idbx.d.ts": "c52c2bb309d13399f52cd092eb21f5558eb8a191e2dbddd091157fc4098f672b",
-    "https://esm.sh/v127/idbx@2.0.0/deno/idbx.mjs": "4876a06576c9fedee056f5f9999842d7397a60609806c156cd8e7e952fc1c4ac",
-    "https://esm.sh/v127/idbx@2.0.0/dest/idbx.d.ts": "0ec31f6a9b85b13ee3943f98add63b6a8b06d5c182c5fb0334d54badb0dc54b2",
     "https://gist.githubusercontent.com/mstoecklein/6f0787c663101f78367586d675dd2088/raw/10a09385b0b7f04cc93c2be79f716dc72a1e7b91/serviceworker.d.ts": "7a88acfc3b1df6abc6b3ef59f7f397f7ef80bba649daca8920b944d0c0aa9abf"
   },
   "npm": {
     "specifiers": {
       "idbatch": "idbatch@0.0.1",
-      "idbx": "idbx@1.1.0"
+      "idbx": "idbx@2.1.0"
     },
     "packages": {
       "@esbuild/android-arm64@0.18.11": {
@@ -270,12 +264,8 @@
           "typescript": "typescript@5.1.6"
         }
       },
-      "idbx@1.0.7": {
-        "integrity": "sha512-Bp3VMBqPSxyyze/TY7mCwBWDBP41lLbsaRC7Ppq4/0aXV8ijwQqsHZ2ddv+bf2ujah9rX4F6b7RBc/x8K+uCIw==",
-        "dependencies": {}
-      },
-      "idbx@1.1.0": {
-        "integrity": "sha512-O/GZzkClE9XmmDkontg0u+sfzOPSsWYrwterRBZrIXquH8+/4bcpYzBcB1/ckHEDAQudH3elUduQJ6/jxOLH2g==",
+      "idbx@2.1.0": {
+        "integrity": "sha512-inK2RkxKJnHzL73aiWOlUnnJCXunt+dmA3h0TfPLIAiAGIb5FM7T2PS2JkP6KvASc0HdonTS0ltYv/ysaTQ/jA==",
         "dependencies": {}
       },
       "is-fullwidth-code-point@3.0.0": {
