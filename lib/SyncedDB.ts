@@ -443,7 +443,7 @@ export class SyncedDB<T extends SyncedDBInfo>
       });
     }
 
-    if (response.ok) {
+    if (response.ok && response.status >= 200 && response.status < 300) {
       if (method === "DELETE" && key) {
         const store = idbx.getStore(this.db, this.storeName, "readwrite");
         await idbx.del(store, key);
