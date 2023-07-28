@@ -448,7 +448,7 @@ export class SyncedDB<T extends SyncedDBInfo>
         const store = idbx.getStore(this.db, this.storeName, "readwrite");
         await idbx.del(store, key);
         return;
-      } else {
+      } else if (response.bodyUsed) {
         const json = await response.json();
         const item = this.#addSyncState(json, "none", "synced");
         const store = idbx.getStore(this.db, this.storeName, "readwrite");
