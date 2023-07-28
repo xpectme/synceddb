@@ -411,9 +411,11 @@ export class SyncedDB<T extends SyncedDBInfo>
     const url = this.#buildUrl(path, key);
 
     let response: Response;
+    let isValid = !this.options.testRun;
     if (this.options.testRun) {
       let responseBody = body ? JSON.parse(body) : null;
       let status = 200;
+      isValid = responseBody !== null;
       const headers = new Headers({ "Content-Type": "application/json" });
       if ("POST" === method) {
         const id = key ?? testRunId(3);
@@ -448,7 +450,7 @@ export class SyncedDB<T extends SyncedDBInfo>
         const store = idbx.getStore(this.db, this.storeName, "readwrite");
         await idbx.del(store, key);
         return;
-      } else if (response.bodyUsed) {
+      } else if (isValid) {
         const json = await response.json();
         const item = this.#addSyncState(json, "none", "synced");
         const store = idbx.getStore(this.db, this.storeName, "readwrite");
